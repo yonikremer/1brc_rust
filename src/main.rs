@@ -57,7 +57,7 @@ fn decimal_str_to_int<'a>(decimal_str: String) -> i16{
 
 
 fn main() {
-    let file_name = "data/weather_stations.csv";
+    let file_name = "data/measurements.txt";
     let file = fs::File::open(file_name).expect("Please fix file name");
     let reader = BufReader::new(file);
     let mut map: HashMap<String, CityInfo> = HashMap::new();
