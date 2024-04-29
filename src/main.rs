@@ -3,8 +3,10 @@ use std::fmt::{Display, Formatter};
 use std::{fs, io};
 use std::io::{BufRead, BufReader};
 use std::num::ParseIntError;
+use crossbeam::scope;
 
 const FILE_PATH: &str = "data/measurements.txt";
+const NUM_THREADS: usize = 16;
 
 struct CityInfo{
     max_temp: i16,
@@ -63,12 +65,10 @@ fn decimal_str_to_int<'a>(decimal_str: String) -> Result<i16, ParseIntError>{
 
 
 fn main() {
-    let file = fs::File::open(FILE_PATH).expect("Please fix file name");
+    let file = fs::File::open(FILE_PATH);
     let reader = BufReader::new(file);
-    let mut map: HashMap<String, CityInfo> = HashMap::new();
-    for result_line in reader.lines() {
-        process_line(&mut map, result_line);
-    }
+    let mut maps: Vec<HashMap<String, CityInfo>> = vec![HashMap::new(); NUM_THREADS];
+
     let raw_str = r#"{"#;
     print!("{raw_str}");
     for (city_name, city_info) in map.iter(){
