@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
-use std::fs;
+use std::{fs, io};
 use std::io::{BufRead, BufReader};
 use std::num::ParseIntError;
 
@@ -66,20 +66,8 @@ fn main() {
     let file = fs::File::open(file_name).expect("Please fix file name");
     let reader = BufReader::new(file);
     let mut map: HashMap<String, CityInfo> = HashMap::new();
-    let mut city_name_copy;
-    for line in reader.lines()
-        .map(|result_line| result_line.unwrap())
-    {
-        let semicolon_index = line.rfind(";").unwrap();
-        let city_name: &str = &line[..semicolon_index];
-        let temp_string: &str = &line[semicolon_index+1..];
-        let temp_int: i16 = decimal_str_to_int(temp_string.to_string()).unwrap();
-        if let Some(city_info) = map.get_mut(city_name) {
-            city_info.add_measurement(temp_int);
-        } else {
-            city_name_copy = String::from(city_name);
-            map.insert(city_name_copy, CityInfo::new(temp_int));
-        }
+    for result_line in reader.lines() {
+        process_line(&mut map, result_line);
     }
     let raw_str = r#"{"#;
     print!("{raw_str}");
@@ -88,4 +76,17 @@ fn main() {
     }
     let raw_str2 = r#"}"#;
     println!("{raw_str2}");
+}
+
+fn process_line(map: &mut HashMap<String, CityInfo>, result_line: io::Result<String>) {
+    let line = result_line.unwrap();
+    let semicolon_index = line.rfind(";").unwrap();
+    let city_name: &str = &line[..semicolon_index];
+    let temp_string: &str = &line[semicolon_index + 1..];
+    let temp_int: i16 = decimal_str_to_int(temp_string.to_string()).unwrap();
+    if let Some(city_info) = map.get_mut(city_name) {
+        city_info.add_measurement(temp_int);
+    } else {
+        map.insert(String::from(city_name), CityInfo::new(temp_int));
+    }
 }
