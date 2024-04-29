@@ -1,13 +1,16 @@
+use std::{fs, thread};
+use std::cmp::{max, min};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
-use std::{fs, io};
 use std::io::{BufRead, BufReader};
 use std::num::ParseIntError;
-use crossbeam::scope;
+use std::ops::{Deref, DerefMut};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 const FILE_PATH: &str = "data/measurements.txt";
 const NUM_THREADS: usize = 16;
 
+#[derive(Clone)]
 struct CityInfo{
     max_temp: i16,
     min_temp: i16,
@@ -33,12 +36,12 @@ impl CityInfo{
         self.sum_measurements += new_measurement as i32;
     }
 
-    // fn merge(&mut self, other: Self) -> <CityInfo as IntoFuture>::Output {
-    //     self.max_temp = max(self.max_temp, other.max_temp);
-    //     self.min_temp = min(self.min_temp, other.min_temp);
-    //     self.num_measurements += other.num_measurements;
-    //     self.sum_measurements += other.sum_measurements;
-    // }
+    fn merge(&mut self, other: Self) {
+        self.max_temp = max(self.max_temp, other.max_temp);
+        self.min_temp = min(self.min_temp, other.min_temp);
+        self.num_measurements += other.num_measurements;
+        self.sum_measurements += other.sum_measurements;
+    }
 }
 
 
@@ -65,28 +68,36 @@ fn decimal_str_to_int<'a>(decimal_str: String) -> Result<i16, ParseIntError>{
 
 
 fn main() {
-    let file = fs::File::open(FILE_PATH);
+    let file = fs::File::open(FILE_PATH).unwrap();
     let reader = BufReader::new(file);
-    let mut maps: Vec<HashMap<String, CityInfo>> = vec![HashMap::new(); NUM_THREADS];
+    // Create a vector of mutex-protected hash maps (one for each thread)
+    let mut result_maps: Vec<Arc<Mutex<HashMap<String, CityInfo>>>> = (0..NUM_THREADS)
+        .map(|_| Arc::new(Mutex::new(HashMap::new())))
+        .collect();
 
-    let raw_str = r#"{"#;
-    print!("{raw_str}");
-    for (city_name, city_info) in map.iter(){
-        print!("{city_name}={city_info}, ");
+    let mut thread_handles = Vec::with_capacity(NUM_THREADS);
+
+    for (thread_id, line) in reader.lines().enumerate() {
+        let line = line.expect("Error reading line");
+        let result_map_clone = result_maps[thread_id % NUM_THREADS].clone();
+        let handle = thread::spawn(move || {
+            process_line(&line, &result_map_clone);
+        });
+
+        thread_handles.push(handle);
     }
-    let raw_str2 = r#"}"#;
-    println!("{raw_str2}");
 }
 
-fn process_line(map: &mut HashMap<String, CityInfo>, result_line: io::Result<String>) {
-    let line = result_line.unwrap();
+fn process_line(line: &String, map: &Arc<Mutex<HashMap<String, CityInfo>>>) {
     let semicolon_index = line.rfind(";").unwrap();
     let city_name: &str = &line[..semicolon_index];
     let temp_string: &str = &line[semicolon_index + 1..];
     let temp_int: i16 = decimal_str_to_int(temp_string.to_string()).unwrap();
-    if let Some(city_info) = map.get_mut(city_name) {
+    let mut guard: MutexGuard<HashMap<String, CityInfo>> = map.deref().lock().unwrap();
+    let map_value: &mut HashMap<String, CityInfo> = guard.deref_mut();
+    if let Some(city_info) = map_value.get_mut(city_name) {
         city_info.add_measurement(temp_int);
     } else {
-        map.insert(String::from(city_name), CityInfo::new(temp_int));
+        map_value.insert(String::from(city_name), CityInfo::new(temp_int));
     }
 }
