@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::fs;
 use std::io::{BufRead, BufReader};
+use std::num::ParseIntError;
 
 
 struct CityInfo{
@@ -48,11 +49,15 @@ impl Display for CityInfo{
 }
 
 
-fn decimal_str_to_int<'a>(decimal_str: String) -> i16{
+fn decimal_str_to_int<'a>(decimal_str: String) -> Result<i16, ParseIntError>{
     let mut split = decimal_str.split(".");
-    let before_dot: i16 = split.next().unwrap().parse::<i16>().unwrap();
-    let after_dot: i16 = split.next().unwrap().parse::<i16>().unwrap();
-    return before_dot * 10 + after_dot;
+    let before_dot: i16 = split.next().unwrap().parse::<i16>()?;
+    let after_dot: i16 = if let Some(str_after_dot) = split.next(){
+        str_after_dot.parse::<i16>()?
+    } else{
+        0
+    };
+    return Ok(before_dot * 10 + after_dot);
 }
 
 
@@ -66,10 +71,17 @@ fn main() {
         .map(|result_line| result_line.expect("Error while reading line"))
         .filter(|line| !line.starts_with("#"))
     {
-        let semicolon_index = line.find(";").unwrap();
+        let semicolon_index = line.rfind(";").expect(
+            format!("Invalid line, no semicolon in {line}").as_str()
+        );
         let city_name: &str = &line[..semicolon_index];
         let temp_string: &str = &line[semicolon_index+1..];
-        let temp_int: i16 = decimal_str_to_int(temp_string.to_string());
+        let temp_int_result = decimal_str_to_int(temp_string.to_string());
+        if temp_int_result.is_err(){
+            let error = temp_int_result.err().unwrap();
+            panic!("Error {error} when parsing {temp_string} to an int. line={line}. semicolon_index={semicolon_index}");
+        }
+        let temp_int = temp_int_result.unwrap();
         if let Some(city_info) = map.get_mut(city_name) {
             city_info.add_measurement(temp_int);
         } else {
