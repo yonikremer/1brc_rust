@@ -68,20 +68,12 @@ fn main() {
     let mut map: HashMap<String, CityInfo> = HashMap::new();
     let mut city_name_copy;
     for line in reader.lines()
-        .map(|result_line| result_line.expect("Error while reading line"))
-        .filter(|line| !line.starts_with("#"))
+        .map(|result_line| result_line.unwrap())
     {
-        let semicolon_index = line.rfind(";").expect(
-            format!("Invalid line, no semicolon in {line}").as_str()
-        );
+        let semicolon_index = line.rfind(";").unwrap();
         let city_name: &str = &line[..semicolon_index];
         let temp_string: &str = &line[semicolon_index+1..];
-        let temp_int_result = decimal_str_to_int(temp_string.to_string());
-        if temp_int_result.is_err(){
-            let error = temp_int_result.err().unwrap();
-            panic!("Error {error} when parsing {temp_string} to an int. line={line}. semicolon_index={semicolon_index}");
-        }
-        let temp_int = temp_int_result.unwrap();
+        let temp_int: i16 = decimal_str_to_int(temp_string.to_string()).unwrap();
         if let Some(city_info) = map.get_mut(city_name) {
             city_info.add_measurement(temp_int);
         } else {
