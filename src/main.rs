@@ -4,6 +4,7 @@ use std::{fs, io};
 use std::io::{BufRead, BufReader};
 use std::num::ParseIntError;
 
+const FILE_PATH: &str = "data/measurements.txt";
 
 struct CityInfo{
     max_temp: i16,
@@ -62,8 +63,7 @@ fn decimal_str_to_int<'a>(decimal_str: String) -> Result<i16, ParseIntError>{
 
 
 fn main() {
-    let file_name = "data/measurements.txt";
-    let file = fs::File::open(file_name).expect("Please fix file name");
+    let file = fs::File::open(FILE_PATH).expect("Please fix file name");
     let reader = BufReader::new(file);
     let mut map: HashMap<String, CityInfo> = HashMap::new();
     for result_line in reader.lines() {
