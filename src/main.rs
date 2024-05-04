@@ -1,10 +1,14 @@
+use std::{str, thread};
 use std::cmp::{max, min};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::fs::File;
+use std::hash::RandomState;
 use std::num::ParseIntError;
-use std::str;
 use std::str::Utf8Error;
+use std::thread::ScopedJoinHandle;
+
+use file_chunker::FileChunker;
 
 const FILE_PATH: &str = "data/measurements.txt";
 const NUM_THREADS: usize = 16;
@@ -100,24 +104,56 @@ fn process_line(line: &str, map: &mut HashMap<String, CityInfo>) {
 
 fn process_chunk(chunk: &[u8]) -> Result<HashMap<String, CityInfo>, Utf8Error>{
     let mut map: HashMap<String, CityInfo> = HashMap::new();
-    let chunk_string: &str = str::from_utf8(chunk)?;
-    for line in chunk_string.split("\n"){
-        process_line(line, &mut map);
+    let result = str::from_utf8(chunk);
+    return if let Err(error) = result {
+        Err(error)
+    } else {
+        let chunk_string = result.unwrap();
+        for line in chunk_string.split("\n") {
+            process_line(line, &mut map);
+        }
+        Ok(map)
     }
-    return Ok(map);
 }
 
 
 fn main() {
-    use file_chunker::FileChunker;
-    let file = File::open(FILE_PATH).unwrap();
-    let chunker = FileChunker::new(&file).unwrap();
-    let result_maps = chunker.chunks(1_000_000_000 / NUM_THREADS , Some('\n'))
-        .unwrap()
-        .iter()
-        .map(|chunk| {
-            process_chunk(chunk).unwrap()
-        }).collect();
-
-    print_results(result_maps);
+    let file_path = FILE_PATH;
+    let file = match File::open(file_path) {
+        Ok(file) => file,
+        Err(err) => {
+            eprintln!("Failed to open file {}: {}", file_path, err);
+            return;
+        }
+    };
+    let chunker = match FileChunker::new(&file) {
+        Ok(chunker) => chunker,
+        Err(err) => {
+            eprintln!("Failed to create chunker: {}", err);
+            return;
+        }
+    };
+    thread::scope(|s| {
+    // Spawn threads to process chunks and collect results
+        let result_maps: Vec<ScopedJoinHandle<HashMap<String, CityInfo, RandomState>>> = match chunker.chunks(1_000_000_000 / NUM_THREADS, Some('\n')) {
+            Ok(chunks) => chunks
+                .into_iter()
+                .map(|chunk| s.spawn(move || { 
+                    process_chunk(chunk).expect("Found invalid UTF-8 chunk") 
+                }))
+                .collect(),
+            Err(err) => {
+                eprintln!("Failed to chunk file: {}", err);
+                return;
+            }
+        };
+        // Collect results from threads
+        let collected_results: Vec<HashMap<String, CityInfo>> = result_maps
+            .into_iter()
+            .map(|handle| handle.join())
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap_or_default();
+        print_results(collected_results);
+    })
 }
+
