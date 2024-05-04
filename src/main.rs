@@ -3,7 +3,6 @@ use std::cmp::{max, min};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::fs::File;
-use std::hash::RandomState;
 use std::num::ParseIntError;
 use std::str::Utf8Error;
 use std::thread::ScopedJoinHandle;
@@ -59,8 +58,11 @@ impl Display for CityInfo{
 
 
 fn decimal_str_to_int<'a>(decimal_str: String) -> Result<i16, ParseIntError>{
+    if let None = decimal_str.find(".") {
+        panic!("Invalid decimal string {}", decimal_str);
+    }
     let mut split = decimal_str.split(".");
-    let before_dot: i16 = split.next().unwrap().parse::<i16>()?;
+    let before_dot: i16 = split.next().expect(format!("Decimal String: {} doesn't have any dots!", decimal_str).as_str()).parse::<i16>()?;
     let after_dot: i16 = if let Some(str_after_dot) = split.next(){
         str_after_dot.parse::<i16>()?
     } else{
@@ -90,10 +92,27 @@ fn print_results(result_maps: Vec<HashMap<String, CityInfo>>) -> (){
 
 
 fn process_line(line: &str, map: &mut HashMap<String, CityInfo>) {
-    let semicolon_index = line.rfind(";").unwrap();
+    if line.len() == 0 {
+        println!("Skipping an empty line");
+        return;
+    }
+    if line.len() < 5{
+        eprintln!("Line is too short!, Line: {}", line);
+        return;
+    }
+    if let None = line.find(";") {
+        eprintln!("Invalid line {}", line);
+        return;
+    }
+    if let None = line.find(".") {
+        eprintln!("Invalid line {}", line);
+        return;
+    }
+    let semicolon_index: usize = line.rfind(";").expect(format!("Line {} doesn't have a semicolon", line).as_str());
     let city_name: &str = &line[..semicolon_index];
     let temp_string: &str = &line[semicolon_index + 1..];
-    let temp_int: i16 = decimal_str_to_int(temp_string.to_string()).unwrap();
+    let temp_int: i16 = decimal_str_to_int(temp_string.to_string())
+        .expect(format!("Can't parse {} as a number", temp_string.to_string()).as_str());
     if let Some(city_info) = map.get_mut(city_name) {
         city_info.add_measurement(temp_int);
     } else {
@@ -135,11 +154,17 @@ fn main() {
     };
     thread::scope(|s| {
     // Spawn threads to process chunks and collect results
-        let result_maps: Vec<ScopedJoinHandle<HashMap<String, CityInfo, RandomState>>> = match chunker.chunks(1_000_000_000 / NUM_THREADS, Some('\n')) {
+        let result_maps: Vec<ScopedJoinHandle<HashMap<String, CityInfo>>> = match chunker.chunks(1_000_000_000 / NUM_THREADS, Some('\n')) {
             Ok(chunks) => chunks
                 .into_iter()
                 .map(|chunk| s.spawn(move || { 
-                    process_chunk(chunk).expect("Found invalid UTF-8 chunk") 
+                    match process_chunk(chunk){
+                        Ok(my_map) => my_map,
+                        Err(err) => {
+                            println!("Chunk: {}", String::from_utf8_lossy(chunk));
+                            panic!("Failed to read chunk as a UTF-8 string: {}", err);
+                        }
+                    }
                 }))
                 .collect(),
             Err(err) => {
