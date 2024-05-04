@@ -92,10 +92,6 @@ fn print_results(result_maps: Vec<HashMap<String, CityInfo>>) -> (){
 
 
 fn process_line(line: &str, map: &mut HashMap<String, CityInfo>) {
-    if line.len() == 0 {
-        println!("Skipping an empty line");
-        return;
-    }
     if line.len() < 5{
         eprintln!("Line is too short!, Line: {}", line);
         return;
@@ -123,16 +119,18 @@ fn process_line(line: &str, map: &mut HashMap<String, CityInfo>) {
 
 fn process_chunk(chunk: &[u8]) -> Result<HashMap<String, CityInfo>, Utf8Error>{
     let mut map: HashMap<String, CityInfo> = HashMap::new();
-    let result = str::from_utf8(chunk);
-    return if let Err(error) = result {
-        Err(error)
-    } else {
-        let chunk_string = result.unwrap();
-        for line in chunk_string.split("\n") {
-            process_line(line, &mut map);
+    let mut start_index = 0;
+    for (i, &byte) in chunk.iter().enumerate() {
+        if byte == b'\n' {
+            if let Ok(line) = str::from_utf8(&chunk[start_index..i]) {
+                process_line(line, &mut map);
+            } else {
+                eprintln!("Invalid UTF-8 sequence in chunk");
+            }
+            start_index = i + 1;
         }
-        Ok(map)
     }
+    Ok(map)
 }
 
 
