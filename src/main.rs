@@ -21,6 +21,8 @@ struct CityInfo{
 }
 
 
+type CitiesMap = HashMap<String, CityInfo>;
+
 impl CityInfo{
     fn new(first_measurement: i16) -> CityInfo{
         CityInfo{
@@ -72,7 +74,7 @@ fn decimal_str_to_int<'a>(decimal_str: String) -> Result<i16, ParseIntError>{
 }
 
 
-fn print_results(result_maps: Vec<HashMap<String, CityInfo>>) -> (){
+fn print_results(result_maps: Vec<CitiesMap>) -> (){
     let mut result = HashMap::<String, CityInfo>::new();
     for curr_map in result_maps.iter(){
         for (city_name, value) in curr_map.iter(){
@@ -91,7 +93,7 @@ fn print_results(result_maps: Vec<HashMap<String, CityInfo>>) -> (){
 }
 
 
-fn process_line(line: &str, map: &mut HashMap<String, CityInfo>) {
+fn process_line(line: &str, map: &mut CitiesMap) {
     if line.len() < 5{
         eprintln!("Line is too short!, Line: {}", line);
         return;
@@ -117,8 +119,8 @@ fn process_line(line: &str, map: &mut HashMap<String, CityInfo>) {
 }
 
 
-fn process_chunk(chunk: &[u8]) -> Result<HashMap<String, CityInfo>, Utf8Error>{
-    let mut map: HashMap<String, CityInfo> = HashMap::new();
+fn process_chunk(chunk: &[u8]) -> Result<CitiesMap, Utf8Error>{
+    let mut map: CitiesMap = HashMap::new();
     let mut start_index = 0;
     for (i, &byte) in chunk.iter().enumerate() {
         if byte == b'\n' {
@@ -154,7 +156,7 @@ fn main() {
     };
     thread::scope(|s| {
     // Spawn threads to process chunks and collect results
-        let result_maps: Vec<ScopedJoinHandle<HashMap<String, CityInfo>>> = match chunker.chunks(1_000_000_000 / NUM_THREADS, Some('\n')) {
+        let result_maps: Vec<ScopedJoinHandle<CitiesMap>> = match chunker.chunks(1_000_000_000 / NUM_THREADS, Some('\n')) {
             Ok(chunks) => chunks
                 .into_iter()
                 .map(|chunk| s.spawn(move || { 
@@ -173,7 +175,7 @@ fn main() {
             }
         };
         // Collect results from threads
-        let collected_results: Vec<HashMap<String, CityInfo>> = result_maps
+        let collected_results: Vec<CitiesMap> = result_maps
             .into_iter()
             .map(|handle| handle.join())
             .collect::<Result<Vec<_>, _>>()
