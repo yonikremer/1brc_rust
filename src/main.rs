@@ -60,9 +60,6 @@ impl Display for CityInfo{
 
 
 fn decimal_str_to_int<'a>(decimal_str: String) -> Result<i16, ParseIntError>{
-    if let None = decimal_str.find(".") {
-        panic!("Invalid decimal string {}", decimal_str);
-    }
     let mut split = decimal_str.split(".");
     let before_dot: i16 = split.next().expect(format!("Decimal String: {} doesn't have any dots!", decimal_str).as_str()).parse::<i16>()?;
     let after_dot: i16 = if let Some(str_after_dot) = split.next(){
