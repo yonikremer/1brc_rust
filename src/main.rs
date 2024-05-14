@@ -126,24 +126,12 @@ fn main() {
     };
     thread::scope(|s| {
     // Spawn threads to process chunks and collect results
-        let result_maps: Vec<ScopedJoinHandle<CitiesMap>> = match chunker.chunks(1_000_000_000 / NUM_THREADS, Some('\n')) {
-            Ok(chunks) => chunks
-                .into_iter()
-                .map(|chunk| s.spawn(move || { 
-                    match process_chunk(chunk){
-                        Ok(my_map) => my_map,
-                        Err(err) => {
-                            println!("Chunk: {}", String::from_utf8_lossy(chunk));
-                            panic!("Failed to read chunk as a UTF-8 string: {}", err);
-                        }
-                    }
-                }))
-                .collect(),
-            Err(err) => {
-                eprintln!("Failed to chunk file: {}", err);
-                return;
-            }
-        };
+        let chunks: Vec<&[u8]> = chunker.chunks(1_000_000_000 / NUM_THREADS, Some('\n')).unwrap();
+        let result_maps: Vec<ScopedJoinHandle<CitiesMap>> = chunks.into_iter()
+            .map(|chunk: &[u8]| s.spawn(move || {
+                process_chunk(chunk).unwrap()
+            }))
+            .collect();
         // Collect results from threads
         let collected_results: Vec<CitiesMap> = result_maps
             .into_iter()
