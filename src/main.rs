@@ -16,7 +16,7 @@ const NUM_THREADS: usize = 1000000;
 struct CityInfo{
     max_temp: i16,
     min_temp: i16,
-    num_measurements: u16,
+    num_measurements: u32,
     sum_measurements: i32
 }
 
