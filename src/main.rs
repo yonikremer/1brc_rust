@@ -120,7 +120,7 @@ fn process_line(line: &str, map: &mut CitiesMap) {
 
 
 fn process_chunk(chunk: &[u8]) -> Result<CitiesMap, Utf8Error>{
-    let mut map: CitiesMap = HashMap::new();
+    let mut map: CitiesMap = HashMap::default();
     let mut start_index = 0;
     for (i, &byte) in chunk.iter().enumerate() {
         if byte == b'\n' {
