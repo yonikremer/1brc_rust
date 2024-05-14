@@ -117,13 +117,7 @@ fn main() {
             return;
         }
     };
-    let chunker = match FileChunker::new(&file) {
-        Ok(chunker) => chunker,
-        Err(err) => {
-            eprintln!("Failed to create chunker: {}", err);
-            return;
-        }
-    };
+    let chunker = FileChunker::new(&file).expect("Failed to create chunker");
     thread::scope(|s| {
     // Spawn threads to process chunks and collect results
         let chunks: Vec<&[u8]> = chunker.chunks(1_000_000_000 / NUM_THREADS, Some('\n')).unwrap();
