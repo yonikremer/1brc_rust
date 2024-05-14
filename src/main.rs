@@ -94,18 +94,6 @@ fn print_results(result_maps: Vec<CitiesMap>) -> (){
 
 
 fn process_line(line: &str, map: &mut CitiesMap) {
-    if line.len() < 5{
-        eprintln!("Line is too short!, Line: {}", line);
-        return;
-    }
-    if let None = line.find(";") {
-        eprintln!("Invalid line {}", line);
-        return;
-    }
-    if let None = line.find(".") {
-        eprintln!("Invalid line {}", line);
-        return;
-    }
     let semicolon_index: usize = line.rfind(";").expect(format!("Line {} doesn't have a semicolon", line).as_str());
     let city_name: &str = &line[..semicolon_index];
     let temp_string: &str = &line[semicolon_index + 1..];
