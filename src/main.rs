@@ -10,7 +10,7 @@ use std::thread::ScopedJoinHandle;
 use file_chunker::FileChunker;
 
 const FILE_PATH: &str = "data/measurements.txt";
-const NUM_THREADS: usize = 16;
+const NUM_THREADS: usize = 1;
 
 #[derive(Clone)]
 struct CityInfo{
@@ -122,10 +122,12 @@ fn process_chunk(chunk: &[u8]) -> Result<HashMap<String, CityInfo>, Utf8Error>{
     let mut start_index = 0;
     for (i, &byte) in chunk.iter().enumerate() {
         if byte == b'\n' {
-            if let Ok(line) = str::from_utf8(&chunk[start_index..i]) {
-                process_line(line, &mut map);
-            } else {
-                eprintln!("Invalid UTF-8 sequence in chunk");
+            match str::from_utf8(&chunk[start_index..i]) {
+                Ok(line) => process_line(line, &mut map),
+                Err(error) => {
+                    eprintln!("Invalid UTF-8 sequence in chunk");
+                    return Err(error);
+                }
             }
             start_index = i + 1;
         }
