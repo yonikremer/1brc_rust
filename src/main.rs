@@ -10,7 +10,7 @@ use std::thread::ScopedJoinHandle;
 use file_chunker::FileChunker;
 
 const FILE_PATH: &str = "data/measurements.txt";
-const NUM_THREADS: usize = 1;
+const NUM_THREADS: usize = 1000000;
 
 #[derive(Clone)]
 struct CityInfo{
