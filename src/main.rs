@@ -1,9 +1,7 @@
 use std::{str, thread};
-use std::cmp::{max, min};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::fs::File;
-use std::num::ParseIntError;
 use std::str::Utf8Error;
 use std::thread::ScopedJoinHandle;
 
@@ -14,35 +12,35 @@ const NUM_THREADS: usize = 1000000;
 
 #[derive(Clone)]
 struct CityInfo{
-    max_temp: i16,
-    min_temp: i16,
+    max_temp: f32,
+    min_temp: f32,
     num_measurements: u32,
-    sum_measurements: i32
+    sum_measurements: f32
 }
 
 
 type CitiesMap = HashMap<String, CityInfo>;
 
 impl CityInfo{
-    fn new(first_measurement: i16) -> CityInfo{
+    fn new(first_measurement: f32) -> CityInfo{
         CityInfo{
             max_temp: first_measurement,
             min_temp: first_measurement,
             num_measurements: 1,
-            sum_measurements: first_measurement as i32
+            sum_measurements: first_measurement
         }
     }
 
-    fn add_measurement(&mut self, new_measurement: i16) {
+    fn add_measurement(&mut self, new_measurement: f32) {
         if new_measurement > self.max_temp {self.max_temp = new_measurement }
         else if new_measurement < self.min_temp { self.min_temp = new_measurement }
         self.num_measurements += 1;
-        self.sum_measurements += new_measurement as i32;
+        self.sum_measurements += new_measurement;
     }
 
     fn merge(&mut self, other: &CityInfo) {
-        self.max_temp = max(self.max_temp, other.max_temp);
-        self.min_temp = min(self.min_temp, other.min_temp);
+        self.max_temp = if self.max_temp > other.max_temp {self.max_temp} else {other.max_temp};
+        self.min_temp = if self.min_temp < other.min_temp {self.min_temp} else {other.min_temp};
         self.num_measurements += other.num_measurements;
         self.sum_measurements += other.sum_measurements;
     }
@@ -51,23 +49,8 @@ impl CityInfo{
 
 impl Display for CityInfo{
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let min: f32 = self.min_temp as f32 / 10.0;
-        let max: f32 = self.max_temp as f32 / 10.0;
-        let mean: f32 = self.sum_measurements as f32 / (self.sum_measurements as f32 * 10.0);
-        write!(f, "{min}/{mean}/{max}")
+        write!(f, "{}/{}/{}", self.min_temp, self.sum_measurements / (self.num_measurements as f32), self.max_temp)
     }
-}
-
-
-fn decimal_str_to_int<'a>(decimal_str: String) -> Result<i16, ParseIntError>{
-    let mut split = decimal_str.split(".");
-    let before_dot: i16 = split.next().expect(format!("Decimal String: {} doesn't have any dots!", decimal_str).as_str()).parse::<i16>()?;
-    let after_dot: i16 = if let Some(str_after_dot) = split.next(){
-        str_after_dot.parse::<i16>()?
-    } else{
-        0
-    };
-    return Ok(before_dot * 10 + after_dot);
 }
 
 
@@ -91,15 +74,17 @@ fn print_results(result_maps: Vec<CitiesMap>) -> (){
 
 
 fn process_line(line: &str, map: &mut CitiesMap) {
-    let semicolon_index: usize = line.rfind(";").expect(format!("Line {} doesn't have a semicolon", line).as_str());
-    let city_name: &str = &line[..semicolon_index];
-    let temp_string: &str = &line[semicolon_index + 1..];
-    let temp_int: i16 = decimal_str_to_int(temp_string.to_string())
-        .expect(format!("Can't parse {} as a number", temp_string.to_string()).as_str());
+    // This function gets a line from the measurements file and adds it to the map
+    // Assumes: The line has a city name and a temperature string.
+    // The temperature string is a decimal number with 1 digit.
+    // The city name is stronger than the temperature string
+    let (city_name, temp_string): (&str, &str) = line.split_once(';')
+        .expect(format!("Can't find ';' in {}", line).as_str());
+    let temp: f32 = temp_string.parse::<f32>().unwrap();
     if let Some(city_info) = map.get_mut(city_name) {
-        city_info.add_measurement(temp_int);
+        city_info.add_measurement(temp);
     } else {
-        map.insert(String::from(city_name), CityInfo::new(temp_int));
+        map.insert(String::from(city_name), CityInfo::new(temp));
     }
 }
 
