@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::fs::{File, OpenOptions};
 use std::io::Write;
+use std::path::Path;
 use std::str;
 use std::str::Utf8Error;
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -144,17 +145,17 @@ fn run_with_config(num_threads: usize, chunk_size: usize) -> bool {
 fn main() {
     // Define the range of thread counts and chunk sizes to test
     let chunk_sizes: Vec<usize> = vec![128, 64, 32, 16, 8, 4, 2, 1];
-    
+    const CSV_PATH: &str = "benchmarking_results.csv";
     // Create a new CSV file
-    let mut csv_file: File  = if let Ok(mut new_csv_file) = File::create("benchmarking_results.csv"){
+    let mut csv_file: File  = if Path::new(CSV_PATH).exists(){
+        OpenOptions::new()
+            .append(true)
+            .open(CSV_PATH)
+            .unwrap()
+    } else {
+        let mut new_csv_file = File::create(CSV_PATH).expect("Failed to create CSV file");
         new_csv_file.write_all(b"num_threads,chunk_size,execution_time\n").expect("Created CSV file but failed to write to it");
         new_csv_file
-    } else {
-        OpenOptions::new()
-            .write(true)
-            .append(true)
-            .open(FILE_PATH)
-            .unwrap()
     };
     let num_threads: usize = num_cpus::get();
     for &chunk_size in &chunk_sizes {
