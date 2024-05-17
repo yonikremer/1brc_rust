@@ -60,8 +60,8 @@ impl Display for CityInfo{
 }
 
 
-fn print_results(result_maps: Arc<Mutex<Vec<HashMap<String, CityInfo>>>>) -> (){
-    let mut result = HashMap::<String, CityInfo>::new();
+fn print_results(result_maps: ThreadSafeCitiesMaps) -> (){
+    let mut result: CitiesMap = HashMap::<String, CityInfo>::new();
     for curr_map in result_maps.lock().unwrap().iter() {
         for (city_name, value) in curr_map.iter(){
             if let Some(result_city_info) = result.get_mut(city_name){
@@ -115,7 +115,7 @@ fn process_chunk(chunk: &[u8]) -> Result<CitiesMap, Utf8Error>{
 
 
 fn main() {
-    let file = match File::open(FILE_PATH) {
+    let file: File = match File::open(FILE_PATH) {
         Ok(file) => file,
         Err(err) => {
             eprintln!("Failed to open file {}: {}", FILE_PATH, err);
