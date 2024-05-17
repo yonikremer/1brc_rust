@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::str;
 use std::str::Utf8Error;
@@ -150,7 +150,11 @@ fn main() {
         new_csv_file.write_all(b"num_threads,chunk_size,execution_time\n").expect("Created CSV file but failed to write to it");
         new_csv_file
     } else {
-        File::open("benchmarking_results.csv").expect("Can't either open or create file")
+        OpenOptions::new()
+            .write(true)
+            .append(true)
+            .open(FILE_PATH)
+            .unwrap()
     };
     let num_threads: usize = num_cpus::get();
     for &chunk_size in &chunk_sizes {
