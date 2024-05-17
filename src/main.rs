@@ -1,17 +1,15 @@
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
-use std::fs::{File, OpenOptions};
-use std::io::Write;
+use std::fs::File;
 use std::path::Path;
 use std::str;
 use std::str::Utf8Error;
 use std::sync::{Arc, Mutex, MutexGuard};
-use std::time::{Duration, Instant};
 
+use clap::Parser;
+use clap_derive::Parser;
 use file_chunker::FileChunker;
 use scoped_threadpool::{Pool, Scope};
-
-const FILE_PATH: &str = "data/measurements.txt";
 
 
 #[derive(Clone)]
@@ -115,17 +113,48 @@ fn process_chunk(chunk: &[u8]) -> Result<CitiesMap, Utf8Error>{
 }
 
 
-fn run_with_config(num_threads: usize, chunk_size: usize) -> bool {
-    let file: File = match File::open(FILE_PATH) {
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// Path to the file
+    #[arg(short, long)]
+    file_path: String,
+
+    /// Number of lines_per_chunk
+    #[arg(short, long, default_value_t = 256)]
+    lines_per_chunk: usize,
+}
+
+
+// Validate the arguments to check that the file exists and that the lines_per_chunk is > 0
+impl Args {
+    fn validate(&self) -> bool {
+        if self.lines_per_chunk == 0 {
+            eprintln!("Lines per chunk must be > 0");
+            return false;
+        }
+        if !Path::new(&self.file_path).exists() {
+            eprintln!("File {} does not exist", self.file_path);
+            return false;
+        }
+        true
+    }
+}
+
+
+fn main() {
+    let args: Args = Args::parse();
+    args.validate();
+    let file: File = match File::open(&args.file_path) {
         Ok(file) => file,
         Err(err) => {
-            eprintln!("Failed to open file {}: {}", FILE_PATH, err);
-            return true;
+            eprintln!("Failed to open file {}: {}", &args.file_path, err);
+            return;
         }
     };
     let chunker: FileChunker = FileChunker::new(&file).expect("Failed to create chunker");
-    let mut pool: Pool = Pool::new(num_threads as u32);
-    let chunks: Vec<&[u8]> = chunker.chunks(chunk_size, Some('\n')).unwrap();
+    let mut pool: Pool = Pool::new(num_cpus::get() as u32);
+    let chunks: Vec<&[u8]> = chunker.chunks(args.lines_per_chunk, Some('\n')).unwrap();
     let result_maps: ThreadSafeCitiesMaps = Arc::new(Mutex::new(Vec::new()));
     pool.scoped(|s: &Scope| {
         for chunk in chunks {
@@ -138,33 +167,4 @@ fn run_with_config(num_threads: usize, chunk_size: usize) -> bool {
         }
     });
     print_results(result_maps);
-    false
 }
-
-
-fn main() {
-    // Define the range of thread counts and chunk sizes to test
-    let chunk_sizes: Vec<usize> = vec![128, 64, 32, 16, 8, 4, 2, 1];
-    const CSV_PATH: &str = "benchmarking_results.csv";
-    // Create a new CSV file
-    let mut csv_file: File  = if Path::new(CSV_PATH).exists(){
-        OpenOptions::new()
-            .append(true)
-            .open(CSV_PATH)
-            .unwrap()
-    } else {
-        let mut new_csv_file = File::create(CSV_PATH).expect("Failed to create CSV file");
-        new_csv_file.write_all(b"num_threads,chunk_size,execution_time\n").expect("Created CSV file but failed to write to it");
-        new_csv_file
-    };
-    let num_threads: usize = num_cpus::get();
-    for &chunk_size in &chunk_sizes {
-        let start_time: Instant = Instant::now();
-        // Run your code with the current configuration
-        run_with_config(num_threads, chunk_size);
-        let duration: Duration = start_time.elapsed();
-        let csv_line: String = format!("{},{},{}\n", num_threads, chunk_size, duration.as_millis());
-        csv_file.write_all(csv_line.as_bytes()).expect("Failed to write to CSV file");
-    }
-}
-
