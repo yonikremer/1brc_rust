@@ -74,6 +74,7 @@ fn print_results(result_maps: ThreadSafeCitiesMaps) -> (){
     for (key, value) in result.iter(){
         print!("{}={}, ", key, value);
     }
+    println!("{}", "}");
 }
 
 
