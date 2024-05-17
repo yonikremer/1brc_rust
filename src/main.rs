@@ -1,5 +1,3 @@
-extern crate scoped_threadpool;
-
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::fs::File;
