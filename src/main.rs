@@ -5,7 +5,7 @@ use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::str;
 use std::str::Utf8Error;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use file_chunker::FileChunker;
 use scoped_threadpool::{Pool, Scope};
@@ -24,6 +24,8 @@ struct CityInfo{
 
 
 type CitiesMap = HashMap<String, CityInfo>;
+type CitiesMaps = Vec<CitiesMap>;
+type ThreadSafeCitiesMaps = Arc<Mutex<CitiesMaps>>;
 
 impl CityInfo{
     fn new(first_measurement: f32) -> CityInfo{
@@ -123,14 +125,15 @@ fn main() {
     let chunker: FileChunker = FileChunker::new(&file).expect("Failed to create chunker");
     let mut pool: Pool = Pool::new(NUM_THREADS as u32);
     let chunks: Vec<&[u8]> = chunker.chunks(CHUNK_SIZE, Some('\n')).unwrap();
-    let result_maps: Arc<Mutex<Vec<HashMap<String, CityInfo>>>> = Arc::new(Mutex::new(Vec::new()));
+
+    let result_maps: ThreadSafeCitiesMaps = Arc::new(Mutex::new(Vec::new()));
     
     pool.scoped(|s: &Scope| {
         for chunk in chunks {
-            let result_maps_clone = Arc::clone(&result_maps);
+            let result_maps_clone: ThreadSafeCitiesMaps = Arc::clone(&result_maps);
             s.execute(move || {
-                let result = process_chunk(&chunk).unwrap();
-                let mut result_maps = result_maps_clone.lock().unwrap();
+                let result: CitiesMap = process_chunk(&chunk).unwrap();
+                let mut result_maps: MutexGuard<CitiesMaps> = result_maps_clone.lock().unwrap();
                 result_maps.push(result);
                 println!("processed {} chunks", result_maps.len());
             });
