@@ -142,8 +142,8 @@ fn run_with_config(num_threads: usize, chunk_size: usize) -> bool {
 
 fn main() {
     // Define the range of thread counts and chunk sizes to test
-    let thread_counts = vec![8, 16, 32, 64];
-    let chunk_sizes = vec![1000, 5000, 10000];
+    let thread_counts = vec![16, 32, 64];
+    let chunk_sizes = vec![100, 500, 1000, 5000, 10000];
 
     // Iterate through different combinations of thread counts and chunk sizes
     for &num_threads in &thread_counts {
