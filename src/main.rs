@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io::Write;
-use std::{io, str};
+use std::str;
 use std::str::Utf8Error;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
