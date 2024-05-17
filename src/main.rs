@@ -4,13 +4,13 @@ use std::fs::File;
 use std::str;
 use std::str::Utf8Error;
 use std::sync::{Arc, Mutex, MutexGuard};
+use std::time::{Duration, Instant};
 
 use file_chunker::FileChunker;
 use scoped_threadpool::{Pool, Scope};
 
 const FILE_PATH: &str = "data/measurements.txt";
-const NUM_THREADS: usize = 16;
-const CHUNK_SIZE: usize = 10000;
+
 
 #[derive(Clone)]
 struct CityInfo{
@@ -112,20 +112,18 @@ fn process_chunk(chunk: &[u8]) -> Result<CitiesMap, Utf8Error>{
 }
 
 
-fn main() {
+fn run_with_config(num_threads: usize, chunk_size: usize) -> bool {
     let file: File = match File::open(FILE_PATH) {
         Ok(file) => file,
         Err(err) => {
             eprintln!("Failed to open file {}: {}", FILE_PATH, err);
-            return;
+            return true;
         }
     };
     let chunker: FileChunker = FileChunker::new(&file).expect("Failed to create chunker");
-    let mut pool: Pool = Pool::new(NUM_THREADS as u32);
-    let chunks: Vec<&[u8]> = chunker.chunks(CHUNK_SIZE, Some('\n')).unwrap();
-
+    let mut pool: Pool = Pool::new(num_threads as u32);
+    let chunks: Vec<&[u8]> = chunker.chunks(chunk_size, Some('\n')).unwrap();
     let result_maps: ThreadSafeCitiesMaps = Arc::new(Mutex::new(Vec::new()));
-    
     pool.scoped(|s: &Scope| {
         for chunk in chunks {
             let result_maps_clone: ThreadSafeCitiesMaps = Arc::clone(&result_maps);
@@ -133,11 +131,33 @@ fn main() {
                 let result: CitiesMap = process_chunk(&chunk).unwrap();
                 let mut result_maps: MutexGuard<CitiesMaps> = result_maps_clone.lock().unwrap();
                 result_maps.push(result);
-                println!("processed {} chunks", result_maps.len());
             });
         }
     });
-    
     print_results(result_maps);
+    false
+}
+
+
+fn main() {
+    // Define the range of thread counts and chunk sizes to test
+    let thread_counts = vec![8, 16, 32, 64];
+    let chunk_sizes = vec![1000, 5000, 10000];
+
+    // Iterate through different combinations of thread counts and chunk sizes
+    for &num_threads in &thread_counts {
+        for &chunk_size in &chunk_sizes {
+            let start_time: Instant = Instant::now();
+
+            // Run your code with the current configuration
+            run_with_config(num_threads, chunk_size);
+
+            let duration: Duration = start_time.elapsed();
+            println!("num_threads: {}", num_threads);
+            println!("chunk_size: {}", chunk_size);
+            println!("Execution time: {:?}", duration);
+            println!();
+        }
+    }
 }
 
