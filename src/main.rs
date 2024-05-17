@@ -147,7 +147,7 @@ fn main() {
     let chunk_sizes = vec![100, 500, 1000, 5000, 10000];
     
     // Create a new CSV file
-    let mut csv_file = File::create("../benchmarking_results.csv").expect("Failed to create CSV file");
+    let mut csv_file = File::create("benchmarking_results.csv").expect("Failed to create CSV file");
     csv_file.write_all(b"num_threads,chunk_size,execution_time\n").expect("Failed to write to CSV file");
 
     // Iterate through different combinations of thread counts and chunk sizes
