@@ -157,7 +157,7 @@ fn main() {
             // Run your code with the current configuration
             run_with_config(num_threads, chunk_size);
             let duration: Duration = start_time.elapsed();
-            let csv_line = format!("{},{},{}", num_threads, chunk_size, duration.as_millis());
+            let csv_line = format!("{},{},{}\n", num_threads, chunk_size, duration.as_millis());
             csv_file.write_all(csv_line.as_bytes()).expect("Failed to write to CSV file");
         }
     }
