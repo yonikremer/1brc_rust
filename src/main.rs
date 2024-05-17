@@ -143,8 +143,7 @@ fn run_with_config(num_threads: usize, chunk_size: usize) -> bool {
 
 fn main() {
     // Define the range of thread counts and chunk sizes to test
-    let thread_counts = vec![16, 32, 64];
-    let chunk_sizes = vec![100, 500, 1000, 5000, 10000];
+    let chunk_sizes: Vec<usize> = vec![128, 64, 32, 16, 8, 4, 2, 1];
     
     // Create a new CSV file
     let mut csv_file: File  = if let Ok(mut new_csv_file) = File::create("benchmarking_results.csv"){
@@ -153,17 +152,14 @@ fn main() {
     } else {
         File::open("benchmarking_results.csv").expect("Can't either open or create file")
     };
-
-    // Iterate through different combinations of thread counts and chunk sizes
-    for &num_threads in &thread_counts {
-        for &chunk_size in &chunk_sizes {
-            let start_time: Instant = Instant::now();
-            // Run your code with the current configuration
-            run_with_config(num_threads, chunk_size);
-            let duration: Duration = start_time.elapsed();
-            let csv_line = format!("{},{},{}\n", num_threads, chunk_size, duration.as_millis());
-            csv_file.write_all(csv_line.as_bytes()).expect("Failed to write to CSV file");
-        }
+    let num_threads: usize = num_cpus::get();
+    for &chunk_size in &chunk_sizes {
+        let start_time: Instant = Instant::now();
+        // Run your code with the current configuration
+        run_with_config(num_threads, chunk_size);
+        let duration: Duration = start_time.elapsed();
+        let csv_line: String = format!("{},{},{}\n", num_threads, chunk_size, duration.as_millis());
+        csv_file.write_all(csv_line.as_bytes()).expect("Failed to write to CSV file");
     }
 }
 
