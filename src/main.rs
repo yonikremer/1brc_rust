@@ -1,14 +1,18 @@
-use std::{str, thread};
+extern crate scoped_threadpool;
+
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::fs::File;
+use std::str;
 use std::str::Utf8Error;
-use std::thread::ScopedJoinHandle;
+use std::sync::{Arc, Mutex};
 
 use file_chunker::FileChunker;
+use scoped_threadpool::{Pool, Scope};
 
 const FILE_PATH: &str = "data/measurements.txt";
-const NUM_THREADS: usize = 1000000;
+const NUM_THREADS: usize = 16;
+const CHUNK_SIZE: usize = 10000;
 
 #[derive(Clone)]
 struct CityInfo{
@@ -54,9 +58,9 @@ impl Display for CityInfo{
 }
 
 
-fn print_results(result_maps: Vec<CitiesMap>) -> (){
+fn print_results(result_maps: Arc<Mutex<Vec<HashMap<String, CityInfo>>>>) -> (){
     let mut result = HashMap::<String, CityInfo>::new();
-    for curr_map in result_maps.iter(){
+    for curr_map in result_maps.lock().unwrap().iter() {
         for (city_name, value) in curr_map.iter(){
             if let Some(result_city_info) = result.get_mut(city_name){
                 result_city_info.merge(value);
@@ -109,30 +113,30 @@ fn process_chunk(chunk: &[u8]) -> Result<CitiesMap, Utf8Error>{
 
 
 fn main() {
-    let file_path = FILE_PATH;
-    let file = match File::open(file_path) {
+    let file = match File::open(FILE_PATH) {
         Ok(file) => file,
         Err(err) => {
-            eprintln!("Failed to open file {}: {}", file_path, err);
+            eprintln!("Failed to open file {}: {}", FILE_PATH, err);
             return;
         }
     };
-    let chunker = FileChunker::new(&file).expect("Failed to create chunker");
-    thread::scope(|s| {
-    // Spawn threads to process chunks and collect results
-        let chunks: Vec<&[u8]> = chunker.chunks(1_000_000_000 / NUM_THREADS, Some('\n')).unwrap();
-        let result_maps: Vec<ScopedJoinHandle<CitiesMap>> = chunks.into_iter()
-            .map(|chunk: &[u8]| s.spawn(move || {
-                process_chunk(chunk).unwrap()
-            }))
-            .collect();
-        // Collect results from threads
-        let collected_results: Vec<CitiesMap> = result_maps
-            .into_iter()
-            .map(|handle| handle.join())
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap_or_default();
-        print_results(collected_results);
-    })
+    let chunker: FileChunker = FileChunker::new(&file).expect("Failed to create chunker");
+    let mut pool: Pool = Pool::new(NUM_THREADS as u32);
+    let chunks: Vec<&[u8]> = chunker.chunks(CHUNK_SIZE, Some('\n')).unwrap();
+    let result_maps: Arc<Mutex<Vec<HashMap<String, CityInfo>>>> = Arc::new(Mutex::new(Vec::new()));
+    
+    pool.scoped(|s: &Scope| {
+        for chunk in chunks {
+            let result_maps_clone = Arc::clone(&result_maps);
+            s.execute(move || {
+                let result = process_chunk(&chunk).unwrap();
+                let mut result_maps = result_maps_clone.lock().unwrap();
+                result_maps.push(result);
+                println!("processed {} chunks", result_maps.len());
+            });
+        }
+    });
+    
+    print_results(result_maps);
 }
 

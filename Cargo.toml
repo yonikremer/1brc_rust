@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 file-chunker = "0.1.1"
+scoped_threadpool = "0.1.9"
