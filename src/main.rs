@@ -1,3 +1,4 @@
+use std::collections::hash_map::Iter;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::fs::File;
@@ -71,8 +72,11 @@ fn print_results(result_maps: ThreadSafeCitiesMaps) -> (){
         }
     }
     print!("{}", "{");
-    for (key, value) in result.iter(){
-        print!("{}={}, ", key, value);
+    let mut result_iter: Iter<String, CityInfo> = result.iter();
+    let (first_key, first_value) = result_iter.next().expect("result is empty");
+    print!("{}={}", first_key, first_value);
+    for (key, value) in result_iter{
+        print!(", {}={}", key, value);
     }
     println!("{}", "}");
 }
