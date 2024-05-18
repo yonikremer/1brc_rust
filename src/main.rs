@@ -90,13 +90,15 @@ fn process_line(line: &str, map: &mut CitiesMap) -> Result<(), Box<dyn std::erro
     if let Some((city_name, temp_string)) = line.split_once(';') {
         let city_name = city_name.trim();
         if city_name.is_empty() {
-            eprintln!("The city name is empty: {}", line);
-            return Err("The city name is empty".into());
+            let error_string = format!("The city name is empty: {}", line);
+            eprintln!("{}", error_string);
+            return Err(error_string.into());
         }
         let temp_string = temp_string.trim();
         if temp_string.is_empty() {
-            eprintln!("The temperature string is empty: {}", line);
-            return Err("The temperature string is empty".into());
+            let error_string = format!("The temperature string is empty: {}", temp_string);
+            eprintln!("{}", error_string);
+            return Err(error_string.into());
         }
         if let Ok(temp) = temp_string.parse::<f32>(){
             if let Some(city_info) = map.get_mut(city_name) {
@@ -107,8 +109,9 @@ fn process_line(line: &str, map: &mut CitiesMap) -> Result<(), Box<dyn std::erro
             Ok(())
         }
         else{
-            eprintln!("The temperature string is not a number: {}", line);
-            return Err("The temperature string is not a number".into());
+            let error_string = format!("The temperature string is not a number: {}", line);
+            eprintln!("{}", error_string);
+            Err(error_string.into())
         }
     }
     else{
@@ -158,24 +161,26 @@ struct Args {
 
 // Validate the arguments to check that the file exists and that the lines_per_chunk is > 0
 impl Args {
-    fn validate(&self) -> bool {
+    fn validate(&self) -> Result<(), String> {
         if self.lines_per_chunk == 0 {
-            eprintln!("Lines per chunk must be > 0");
-            return false;
+            return Err(format!("Lines per chunk must be > 0. Got {}", self.lines_per_chunk));
         }
         if !Path::new(&self.file_path).exists() {
-            eprintln!("File {} does not exist", self.file_path);
-            return false;
+            return Err(format!("File {} does not exist", self.file_path));
         }
-        true
+        Ok(())
     }
 }
 
 
 fn main() {
     let args: Args = Args::parse();
-    if !args.validate(){
-        return;
+    match args.validate() {
+        Ok(_) => {},
+        Err(err) => {
+            eprintln!("{}", err);
+            return;
+        }
     }
     let file: File = match File::open(&args.file_path) {
         Ok(file) => file,
@@ -186,14 +191,14 @@ fn main() {
     };
     let chunker: FileChunker = FileChunker::new(&file).expect("Failed to create chunker");
     let mut pool: Pool = Pool::new(num_cpus::get() as u32);
-    let chunks: Vec<&[u8]> = chunker.chunks(args.lines_per_chunk, Some('\n')).unwrap();
+    let chunks: Vec<&[u8]> = chunker.chunks(args.lines_per_chunk, Some('\n')).expect("Failed to get chunks");
     let result_maps: ThreadSafeCitiesMaps = Arc::new(Mutex::new(Vec::new()));
     pool.scoped(|s: &Scope| {
         for chunk in chunks {
             let result_maps_clone: ThreadSafeCitiesMaps = Arc::clone(&result_maps);
             s.execute(move || {
                 let result: CitiesMap = process_chunk(&chunk).unwrap();
-                let mut result_maps: MutexGuard<CitiesMaps> = result_maps_clone.lock().unwrap();
+                let mut result_maps: MutexGuard<CitiesMaps> = result_maps_clone.lock().expect("Failed to lock mutex");
                 result_maps.push(result);
             });
         }
