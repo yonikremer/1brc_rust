@@ -4,14 +4,12 @@ use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::path::Path;
 use std::str;
-use std::str::Utf8Error;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use clap::Parser;
 use clap_derive::Parser;
 use file_chunker::FileChunker;
 use scoped_threadpool::{Pool, Scope};
-
 
 #[derive(Clone)]
 struct CityInfo{
@@ -82,32 +80,60 @@ fn print_results(result_maps: ThreadSafeCitiesMaps) -> (){
 }
 
 
-fn process_line(line: &str, map: &mut CitiesMap) {
+fn process_line(line: &str, map: &mut CitiesMap) -> Result<(), Box<dyn std::error::Error>> {
     // This function gets a line from the measurements file and adds it to the map
     // Assumes: The line has a city name and a temperature string.
     // The temperature string is a decimal number with 1 digit.
     // The city name is stronger than the temperature string
-    let (city_name, temp_string): (&str, &str) = line.split_once(';')
-        .expect(format!("Can't find ';' in {}", line).as_str());
-    let temp: f32 = temp_string.parse::<f32>().unwrap();
-    if let Some(city_info) = map.get_mut(city_name) {
-        city_info.add_measurement(temp);
-    } else {
-        map.insert(String::from(city_name), CityInfo::new(temp));
+    // let (city_name, temp_string): (&str, &str) = line.split_once(';')
+    //     .expect(format!("Can't find ';' in {}", line).as_str());
+    if let Some((city_name, temp_string)) = line.split_once(';') {
+        let city_name = city_name.trim();
+        if city_name.is_empty() {
+            eprintln!("The city name is empty: {}", line);
+            return Err("The city name is empty".into());
+        }
+        let temp_string = temp_string.trim();
+        if temp_string.is_empty() {
+            eprintln!("The temperature string is empty: {}", line);
+            return Err("The temperature string is empty".into());
+        }
+        if let Ok(temp) = temp_string.parse::<f32>(){
+            if let Some(city_info) = map.get_mut(city_name) {
+                city_info.add_measurement(temp);
+            } else {
+                map.insert(String::from(city_name), CityInfo::new(temp));
+            }
+            Ok(())
+        }
+        else{
+            eprintln!("The temperature string is not a number: {}", line);
+            return Err("The temperature string is not a number".into());
+        }
     }
+    else{
+        let error_string = format!("Can't find ';' in {}", line);
+        eprintln!("{}", error_string);
+        Err(error_string.into())
+    }
+    
 }
 
 
-fn process_chunk(chunk: &[u8]) -> Result<CitiesMap, Utf8Error>{
+fn process_chunk(chunk: &[u8]) -> Result<CitiesMap, Box<dyn std::error::Error>>{
     let mut map: CitiesMap = HashMap::default();
     let mut start_index = 0;
     for (i, &byte) in chunk.iter().enumerate() {
         if byte == b'\n' {
             match str::from_utf8(&chunk[start_index..i]) {
-                Ok(line) => process_line(line, &mut map),
+                Ok(line) => { 
+                    process_line(line, &mut map)?;
+                },
                 Err(error) => {
                     eprintln!("Invalid UTF-8 sequence in chunk");
-                    return Err(error);
+                    eprintln!("The invalid sequence is {:?}", &chunk[start_index..i]);
+                    eprintln!("The error is {:?}", error);
+                    return Err(Box::new(error));
                 }
             }
             start_index = i + 1;
