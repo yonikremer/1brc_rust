@@ -148,7 +148,9 @@ impl Args {
 
 fn main() {
     let args: Args = Args::parse();
-    args.validate();
+    if !args.validate(){
+        return;
+    }
     let file: File = match File::open(&args.file_path) {
         Ok(file) => file,
         Err(err) => {
